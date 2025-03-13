@@ -1,0 +1,87 @@
+server.js
+
+const express = require('express');
+const mongoose = require('mongoose');
+const dotenv = require('dotenv');
+const cors = require('cors');
+dotenv.config();
+const app = express();
+
+
+app.use(cors());
+app.use(express.json());
+
+
+mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error(err));
+
+
+app.use('/api', require('./routes/translationRoutes'));
+
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+
+user.js
+
+const mongoose = require('mongoose');
+
+const UserSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+});
+
+const TranslationSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  text: { type: String, required: true },
+  translatedText: { type: String, required: true },
+  targetLanguage: { type: String, required: true },
+  date: { type: Date, default: Date.now },
+});
+
+module.exports = {
+  User: mongoose.model('User', UserSchema),
+  Translation: mongoose.model('Translation', TranslationSchema),
+};
+
+
+
+translation.js
+
+
+const express = require('express');
+const { Translation } = require('../models/Translation');
+const axios = require('axios');
+const router = express.Router();
+
+router.post('/translate', async (req, res) => {
+  const { text, targetLanguage, userId } = req.body;
+
+  try {
+    const apiKey = process.env.TRANSLATION_API_KEY; 
+    const response = await axios.post('https://translation-api-url.com', {
+      q: text,
+      target: targetLanguage,
+      key: apiKey,
+    });
+
+    const translatedText = response.data.data.translations[0].translatedText;
+
+    const newTranslation = new Translation({
+      userId,
+      text,
+      translatedText,
+      targetLanguage,
+    });
+
+    await newTranslation.save();
+    res.json(newTranslation);
+  } catch (err) {
+    res.status(500).json({ error: 'Translation failed' });
+  }
+});
+
+module.exports = router;
+
